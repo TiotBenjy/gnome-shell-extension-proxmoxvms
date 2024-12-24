@@ -1,0 +1,13 @@
+{
+  "name": "Proxmox VMs",
+  "description": "Manage Proxmox VMs & containers through a gnome-shell menu",
+  "url": "https://github.com/tiotbenjy/gnome-shell-extension-proxmoxvms",
+  "uuid": "proxmoxvms@tiotbenjy",
+  "shell-version": [
+    "45",
+    "46",
+    "47"
+  ],
+  "settings-schema": "org.gnome.shell.extensions.proxmoxvms",
+  "gettext-domain": "gnome-shell-extension-proxmoxvms"
+}

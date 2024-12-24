@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist gettext-domain="gnome-shell-extension-proxmoxvms">
+  <schema id="org.gnome.shell.extensions.proxmoxvms" path="/org/gnome/shell/extensions/proxmoxvms/">
+    <key type="i" name="refresh-interval">
+      <default>60</default>
+      <summary>Refresh interval</summary>
+    </key>
+
+    <key type="b" name="allow-unsafe-ssl">
+      <default>false</default>
+      <summary>Allow untrusted SSL certificates</summary>
+    </key>
+
+    <key type="s" name="pve-host">
+      <default>'pve.example.com:8006'</default>
+      <summary>Your Proxmox VE host</summary>
+    </key>
+    
+    <key type="s" name="api-token-id">
+      <default>'root@pam!gnome-shell'</default>
+      <summary>Your token ID from PVE</summary>
+    </key>
+
+    <key type="s" name="api-secret">
+      <default>''</default>
+      <summary>Your personal API secret key from PVE</summary>
+    </key>
+  </schema>
+</schemalist>
