@@ -136,3 +136,51 @@ export function send_async_request(url, type, data, token, allowInvlidCa = false
         }
     );
 }
+
+/**
+ * makeProgressBar function to create a progress bar string
+ * 
+ * @param {Number} progress The progress value
+ * @param {Number} total The total value
+ * @param {Number} size The size of the progress bar
+ * @returns {String} The progress bar string
+ */
+export function makeProgressBar(progress, total, size) {
+    _log("[DEBUG] Progress: %s, Total: %s, Size: %s", [progress, total, size]);
+
+    let progressRatio = Math.max(0, Math.min(progress / total, 1)); // Clamp ratio between 0 and 1
+    let progressSize = Math.floor(progressRatio * size);
+    
+    _log("[DEBUG] Progress Size: %s", [progressSize]);
+
+    let progressBar = "[" + "|".repeat(progressSize) + " ".repeat(size - progressSize) + "]";
+    return progressBar;
+}
+
+/**
+ * Convert a value between units (B, KB, MB, GB, TB) or auto-select the best unit.
+ * 
+ * @param {number} value - The value to convert.
+ * @param {boolean} [auto=false] - Whether to automatically select the best unit.
+ * @param {string} [from="B"] - The unit to convert from.
+ * @param {string} [to="B"] - The unit to convert to.
+ * @returns {Object} The converted value and unit.
+ */
+export function convertUnit(value, auto = false, from = "B", to = "B") {
+    const units = ["B", "KB", "MB", "GB", "TB"];
+    
+    let fromIndex = units.indexOf(from);
+
+    if (auto) {
+        let toIndex = fromIndex;
+        while (value >= 1024 && toIndex < units.length - 1) {
+            value /= 1024;
+            toIndex++;
+        }
+        return { value: parseFloat(value.toFixed(2)), unit: units[toIndex] };
+    } else {
+        let toIndex = units.indexOf(to);
+        const convertedValue = value / Math.pow(1024, toIndex - fromIndex);
+        return { value: parseFloat(convertedValue.toFixed(2)), unit: units[toIndex] };
+    }
+}

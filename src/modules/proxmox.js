@@ -76,7 +76,6 @@ export async function getAllVms(params) {
 
         // iterate over all vms
         for (let vm of vms.data) {
-            console.log(`[DEBUG] VM: ${JSON.stringify(vm)}`);
             allVms.get(node.node).push(
                 new ProxmoxVm(params, node, vm)
             );
@@ -132,20 +131,40 @@ class ProxmoxVm {
         await callProxmoxApi(this.settings.node, `/nodes/${this.nodeId}/qemu/${this.vmId}/status/shutdown`, this.settings.token, "POST");
     }
 
-    async getConfig() {
-        return await callProxmoxApi(this.settings.node, `/nodes/${this.nodeId}/qemu/${this.vmId}/config`, this.settings.token, "GET");
-    }
+    async details() {
+        try {
+            const s = await callProxmoxApi({ node: this.settings.node, path: `/nodes/${this.nodeId}/qemu/${this.vmId}/status/current`, token: this.settings.token, method: "GET", allowUnsafeSsl: this.settings.allowUnsafeSsl });
+            const vmStats = s.data;
 
-    async toString() {
-        // get vm details
-        let config = await this.getConfig();
+            let cpuUsageBar = "";
+            if (vmStats.cpu) {
+                cpuUsageBar = Utils.makeProgressBar(vmStats.cpu.toFixed(2), 100, 30);
+            }
 
-        return [
-            `Name: ${this.name}`,
-            `Status: ${this.status}`,
-            `Memory: ${config.data.memory}`,
-            `CPUs: ${config.data.cpus}`,
-            `OS Type: ${config.data["ostype"]}`
-        ].join("\n");
+            // make progress bar for memory usage
+            let memoryUsageBar = "";
+            let memUsage = {};
+            let memTotal = {};
+            if (vmStats.mem) {
+                memUsage = Utils.convertUnit(vmStats.mem, true);
+                memTotal = Utils.convertUnit(vmStats.maxmem, true);
+                memoryUsageBar = Utils.makeProgressBar(vmStats.mem, vmStats.maxmem, 30);
+            }
+
+            const netIn = Utils.convertUnit(vmStats.netin, true);
+            const netOut = Utils.convertUnit(vmStats.netout, true);
+
+            return [
+                `CPU: ${cpuUsageBar} ${(vmStats.cpu).toFixed(2)}%`,
+                `Memory: ${memoryUsageBar} ${memUsage.value}${memUsage.unit} / ${memTotal.value}${memTotal.unit}`,
+                `NetIn: ${netIn.value}${netIn.unit}/s`,
+                `NetOut: ${netOut.value}${netOut.unit}/s`
+            ].join("\n");
+
+        }
+        catch (error) {
+            Utils._log('Error getting details: %s', [error]);
+            return "Error getting details";
+        }
     }
 }
