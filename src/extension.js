@@ -7,8 +7,6 @@ import Gio from "gi://Gio";
 import GLib from "gi://GLib";
 import * as PanelMenu from "resource:///org/gnome/shell/ui/panelMenu.js";
 import * as PopupMenu from "resource:///org/gnome/shell/ui/popupMenu.js";
-import * as Dialog from "resource:///org/gnome/shell/ui/dialog.js";
-import * as ModalDialog from "resource:///org/gnome/shell/ui/modalDialog.js";
 import GObject from "gi://GObject";
 
 import { Extension } from "resource:///org/gnome/shell/extensions/extension.js";
@@ -23,6 +21,7 @@ export default class ContainersExtension extends Extension {
         this._idle = false;
         this._connected = false;
         this._network_monitor = Gio.network_monitor_get_default();
+        this.getAllVms = Proxmox.getAllVms;
         //endregion
 
         //region Signals
@@ -48,9 +47,6 @@ export default class ContainersExtension extends Extension {
         this._indicator.menu.connect("open-state-changed", () => {
             if (this.menu.isOpen) {
                 this._renderMenu();
-                this._sync();
-            } else {
-                this._stop_sync();
             }
         });
 
@@ -93,14 +89,6 @@ export default class ContainersExtension extends Extension {
         this._indicator?.destroy();
         this._indicator = null;
         this._settings = null;
-    }
-
-    async _sync() {
-
-    }
-
-    async _stop_sync() {
-
     }
 
     _onNetworkStateChanged() {
@@ -182,12 +170,6 @@ export default class ContainersExtension extends Extension {
             const test = new PopupMenu.PopupMenuItem("Test - 1");
 
             test.connect("activate", () => {
-
-                let formatedToken = "PVEAPIToken=";
-                formatedToken += this._settings.get_string("api-token-id");
-                formatedToken += "=";
-                formatedToken += this._settings.get_string("api-secret");
-
                 Proxmox.checkProxmoxHealth({
                     node: this._settings.get_string("pve-host")
                 }).then((isAlive) => {
@@ -197,22 +179,17 @@ export default class ContainersExtension extends Extension {
                         return;
                     }
 
-                    Proxmox.getAllVms({
-                        node: this._settings.get_string("pve-host"),
-                        token: formatedToken,
-                        allowUnsafeSsl: this._settings.get_boolean('allow-unsafe-ssl')
-                    }).then((vms) => {
+                    this.getAllVms().then((vms) => {
                         for (let [_, containers] of vms) {
                             for (let c of containers) {
-                                log(`[DEBUG - getAllVms] Container: ${c.name}`);
                                 this.menu.addMenuItem(new ContainerSubMenuItem(c, this._settings));
                             }
                         }
                     }).catch((error) => {
-                        log(`[DEBUG - getAllVms] ${error}`);
+                        log(`[ERROR - getAllVms] ${error}`);
                     });
                 }).catch((error) => {
-                    log(`[DEBUG - checkProxmoxHealth] ${error}`);
+                    log(`[ERROR - checkProxmoxHealth] ${error}`);
                 });
             });
 
@@ -291,7 +268,7 @@ class ContainerSubMenuItem extends PopupMenu.PopupSubMenuMenuItem {
                 this.insert_child_at_index(createIcon("action-unavailable-symbolic", "status-undefined"), 1);
                 break;
         }
-        
+
         // the element on index 3 is the expander, a spacer that clutter fills with space
         this.insert_child_at_index(restartBtn, 4);
         this.insert_child_at_index(pauseBtn, 4);

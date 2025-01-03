@@ -48,26 +48,26 @@ async function callProxmoxApi(params) {
     }
 }
 
-export async function getAllVms(params) {
+export async function getAllVms() {
     // create map to store all vms from all nodes
     let allVms = new Map();
 
+    let baseConfig = {
+        node: this._settings.get_string("pve-host"),
+        token: "PVEAPIToken=" + this._settings.get_string("api-token-id") + "=" + this._settings.get_string("api-secret"),
+        allowUnsafeSsl: this._settings.get_boolean('allow-unsafe-ssl')
+    };
+
     // get all nodes from proxmox
     let nodes = await callProxmoxApi({
-        node: params.node, path: "/nodes",
-        token: params.token, method: "GET",
-        allowUnsafeSsl: params.allowUnsafeSsl
+        path: "/nodes", method: "GET", ...baseConfig
     });
 
     // iterate over all nodes
     for (let node of nodes.data) {
         // get all vms from node
         let vms = await callProxmoxApi({
-            node: params.node,
-            path: `/nodes/${node.node}/qemu`,
-            token: params.token,
-            method: "GET",
-            allowUnsafeSsl: params.allowUnsafeSsl
+            path: `/nodes/${node.node}/qemu`, method: "GET", ...baseConfig
         });
 
         if (!allVms.has(node.node)) {
@@ -77,7 +77,7 @@ export async function getAllVms(params) {
         // iterate over all vms
         for (let vm of vms.data) {
             allVms.get(node.node).push(
-                new ProxmoxVm(params, node, vm)
+                new ProxmoxVm(baseConfig, node, vm)
             );
         }
     }
