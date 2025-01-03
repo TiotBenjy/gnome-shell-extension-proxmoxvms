@@ -73,7 +73,6 @@ export default class ContainersExtension extends Extension {
             prefs.connect("activate", () => this.openPreferences());
 
             this.menu.addMenuItem(prefs);
-            this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
             const test = new PopupMenu.PopupMenuItem("Test");
             
@@ -98,7 +97,12 @@ export default class ContainersExtension extends Extension {
                         token: formatedToken,
                         allowUnsafeSsl: this._settings.get_boolean('allow-unsafe-ssl')
                     }).then((vms) => {
-                        log(`[DEBUG - getAllVms] ${JSON.stringify(vms)}`);
+                        for (let [_, containers] of vms) {
+                            for (let container of containers) {
+                                log(`[DEBUG - getAllVms] Container: ${container.name}`);
+                                this.menu.addMenuItem(new ContainerSubMenuItem(container, this._settings));
+                            }
+                        }
                     }).catch((error) => {
                         log(`[DEBUG - getAllVms] ${error}`);
                     });
@@ -106,7 +110,9 @@ export default class ContainersExtension extends Extension {
                     log(`[DEBUG - checkProxmoxHealth] ${error}`);
                 });
             });
+
             this.menu.addMenuItem(test);
+            this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
         } catch (err) {
             this.menu.removeAll();
             const errMsg = "Error occurred when fetching containers";
@@ -121,10 +127,10 @@ class ContainerSubMenuItem extends PopupMenu.PopupSubMenuMenuItem {
         GObject.registerClass(this);
     }
 
-    constructor(container, settings) {
-        super(container.name);
+    constructor(vm, settings) {
+        super(vm.displayName);
         this.menu.box.add_style_class_name("container-menu-item");
-        const label = new St.Label({ text: container.image });
+        const label = new St.Label({ text: vm.displayName });
         label.add_style_class_name("container-name-label");
         const actions = new PopupMenu.PopupBaseMenuItem({ reactive: false, can_focus: false, style_class: "container-action-bar" });
         actions.actor.set_x_expand(true);
@@ -132,24 +138,22 @@ class ContainerSubMenuItem extends PopupMenu.PopupSubMenuMenuItem {
         // this.insert_child_at_index(actions, 2);
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
-        const startBtn = createActionButton(() => container.start(), "media-playback-start-symbolic");
-        const stopBtn = createActionButton(() => container.stop(), "media-playback-stop-symbolic");
-        const restartBtn = createActionButton(() => container.restart(), "system-reboot-symbolic");
+        const startBtn = createActionButton(() => vm.start(), "media-playback-start-symbolic");
+        const stopBtn = createActionButton(() => vm.stop(), "media-playback-stop-symbolic");
+        const restartBtn = createActionButton(() => vm.restart(), "system-reboot-symbolic");
         const pauseBtn = createActionButton(
             () => {
-                if (container.status.split(" ")[0] === "running") {
+                if (vm.status.split(" ")[0] === "running") {
                     container.pause();
                 }
-                if (container.status.split(" ")[0] === "paused") {
+                if (vm.status.split(" ")[0] === "paused") {
                     container.unpause();
                 }
             },
             "media-playback-pause-symbolic"
         );
+
         pauseBtn.toggle_mode = true;
-        const deleteBtn = createActionButton(
-            () => new RemoveContainerDialog(container).open(1, true),
-            "user-trash-symbolic");
 
         switch (container.status.split(" ")[0]) {
             case "Exited":
@@ -166,7 +170,6 @@ class ContainerSubMenuItem extends PopupMenu.PopupSubMenuMenuItem {
             }
             case "Up":
             case "running": {
-                deleteBtn.reactive = false;
                 pauseBtn.checked = false;
                 this.insert_child_at_index(createIcon("media-playback-start-symbolic", "status-running"), 1);
                 // the element on index 3 is the expander, a spacer that clutter fills with space
@@ -186,31 +189,21 @@ class ContainerSubMenuItem extends PopupMenu.PopupSubMenuMenuItem {
         // the element on index 3 is the expander, a spacer that clutter fills with space
         this.insert_child_at_index(restartBtn, 4);
         this.insert_child_at_index(pauseBtn, 4);
-        this.insert_child_at_index(deleteBtn, 4);
 
         if (settings.extraInfo) {
-            const info = new PopupMenu.PopupMenuItem(`${container.details()}`);
-            info.add_style_class_name("container-info");
-            this.menu.addMenuItem(info);
+            // const info = new PopupMenu.PopupMenuItem(`${container.details()}`);
+            // info.add_style_class_name("container-info");
+            // this.menu.addMenuItem(info);
             this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
         }
 
-        this.menu.addAction("Show Logs", () => container.logs());
-        this.menu.addAction("Watch Top", () => container.watchTop());
-        this.menu.addAction("Open Shell", () => container.shell());
-        this.menu.addAction("Watch Statistics", () => container.stats());
-        this.menu.addAction("Copy Container Details", () => setClipboard(container.details()));
+        // this.menu.addAction("Show Logs", () => container.logs());
+        // this.menu.addAction("Watch Top", () => container.watchTop());
+        // this.menu.addAction("Open Shell", () => container.shell());
+        // this.menu.addAction("Watch Statistics", () => container.stats());
         // the css nth- or last-of-type is probably not implemented in gjs
         this.menu.box.get_children().at(-1).add_style_class_name("last-container-menu-item");
     }
-}
-
-/**
- * set clipboard with @param text
- * @param {string} text to set the clipboard with
- */
-function setClipboard(text) {
-    St.Clipboard.get_default().set_text(St.ClipboardType.PRIMARY, text);
 }
 
 /**
@@ -232,33 +225,6 @@ function createActionButton(command, iconName) {
         command();
     });
     return btn;
-}
-
-class RemoveContainerDialog extends ModalDialog.ModalDialog {
-    static {
-        GObject.registerClass(this);
-    }
-
-    constructor(container) {
-        super();
-        const content = new Dialog.MessageDialogContent({
-            title: "Remove Container",
-            description: `Are you sure you want to remove container ${container.name}?`,
-        });
-        this.contentLayout.add_child(content);
-        this.addButton({
-            action: () => this.close(),
-            label: "Cancel",
-            key: Clutter.KEY_Escapse,
-        });
-        this.addButton({
-            action: () => {
-                this.close();
-                container.rm();
-            },
-            label: "Remove",
-        });
-    }
 }
 
 /**

@@ -8,11 +8,7 @@ import Gio from "gi://Gio";
 import GLib from "gi://GLib";
 import * as Utils from "./utils.js";
 
-const TERM_KEEP_ON_EXIT = true;
-const TERM_CLOSE_ON_EXIT = false;
-
 Gio._promisify(Gio.Subprocess.prototype, "communicate_utf8_async", "communicate_utf8_finish");
-
 
 export async function checkProxmoxHealth(params) {
     // ping node with system command to check if it is reachable
@@ -33,7 +29,7 @@ async function callProxmoxApi(params) {
         return new Promise(async (resolve, reject) => {
             const { node, path, token, method, allowUnsafeSsl, data } = params;
             const url = `https://${node}/api2/json${path}`;
- 
+
             try {
                 Utils.send_async_request(url, method, data ?? null, token, allowUnsafeSsl, (response) => {
                     Utils._log(`[DEBUG] Response: ${JSON.stringify(response)}`);
@@ -74,16 +70,16 @@ export async function getAllVms(params) {
             allowUnsafeSsl: params.allowUnsafeSsl
         });
 
-        log(`[DEBUG] Found ${vms.data.length} VMs on node ${node.node}`);
-        log(`[DEBUG] ${JSON.stringify(vms.data)}`);
-
         if (!allVms.has(node.node)) {
             allVms.set(node.node, []);
         }
 
         // iterate over all vms
         for (let vm of vms.data) {
-            allVms.get(node.node).push(vm);
+            console.log(`[DEBUG] VM: ${JSON.stringify(vm)}`);
+            allVms.get(node.node).push(
+                new ProxmoxVm(params, node, vm)
+            );
         }
     }
 
@@ -115,6 +111,7 @@ class ProxmoxVm {
         this.nodeId = jsonNode.node;
         this.vmId = jsonVm.vmid;
         this.name = jsonVm.name;
+        this.displayName = `${jsonNode.node} - ${jsonVm.vmid} (${jsonVm.name})`;
         this.status = jsonVm.status;
         this.settings = settings;
     }
@@ -135,10 +132,6 @@ class ProxmoxVm {
         await callProxmoxApi(this.settings.node, `/nodes/${this.nodeId}/qemu/${this.vmId}/status/shutdown`, this.settings.token, "POST");
     }
 
-    async delete() {
-        await callProxmoxApi(this.settings.node, `/nodes/${this.nodeId}/qemu/${this.vmId}`, this.settings.token, "DELETE");
-    }
-
     async getConfig() {
         return await callProxmoxApi(this.settings.node, `/nodes/${this.nodeId}/qemu/${this.vmId}/config`, this.settings.token, "GET");
     }
@@ -147,20 +140,9 @@ class ProxmoxVm {
         // get vm details
         let config = await this.getConfig();
 
-
-
-        const totalMemory = config.data.memory;
-        const totalCpus = config.data.cpus;
-
-        const usedMemory = config.data["vmstate.memory"];
-        const usedCpus = config.data["vmstate.cpus"];
-
-
         return [
             `Name: ${this.name}`,
             `Status: ${this.status}`,
-            `Node: ${this.nodeId}`,
-            `VM ID: ${this.vmId}`,
             `Memory: ${config.data.memory}`,
             `CPUs: ${config.data.cpus}`,
             `OS Type: ${config.data["ostype"]}`
